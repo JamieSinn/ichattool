@@ -11,11 +11,14 @@ import (
 	"strings"
 )
 
+var (
+	targetFile = flag.String("f", "TestFile.plist", "Single extraction: Target plist/ichat file to decode.")
+	targetDir  = flag.String("d", "", "Bulk extraction: Target directory to extract plist/ichat files from.")
+	outputDir  = flag.String("o", "", "Output directory to put extracted images in.")
+	imagesOnly = flag.Bool("i", false, "Enables image only extraction")
+)
+
 func main() {
-	targetFile := flag.String("f", "TestFile.plist", "Single extraction: Target plist/ichat file to decode.")
-	targetDir := flag.String("d", "", "Bulk extraction: Target directory to extract plist/ichat files from.")
-	outputDir := flag.String("o", "", "Output directory to put extracted images in.")
-	imagesOnly := flag.Bool("i", false, "Enables image only extraction")
 	flag.Parse()
 
 	if *targetFile != "" && *targetDir != "" {
@@ -25,32 +28,14 @@ func main() {
 	if *targetFile != "" {
 		if *imagesOnly {
 			images := iChatTool.ExtractImages(*targetFile)
-			for _, img := range images {
-				size := len(img.ImageBytes)
-
-				f, err := os.Create(filepath.Join(*outputDir, *targetFile+"_"+strconv.Itoa(size)+"."+img.ImageType))
-				if err != nil {
-					break
-				}
-				w := bufio.NewWriter(f)
-				n, err := w.Write(img.ImageBytes)
-				fmt.Printf("\twrote %d bytes\n", n)
-				if err != nil {
-
-					fmt.Println("\tInvalid image. Byte data:")
-					fmt.Println(img.ImageBytes[:10])
-					fmt.Println(img.ImageBytes[size-10:])
-					fmt.Println(err)
-
-					break
-				}
-			}
+			writeImages(images)
 		}
 	} else if *targetDir != "" {
 		files := getFiles(*targetDir)
 		for _, file := range files {
 			if *imagesOnly {
-				iChatTool.ExtractImages(file)
+				images := iChatTool.ExtractImages(file)
+				writeImages(images)
 			} else {
 				iChatTool.ExtractData(file)
 			}
@@ -74,4 +59,27 @@ func getFiles(path string) (files []string) {
 
 	}
 	return
+}
+
+func writeImages(images []iChatTool.AttachedImage) {
+	for _, img := range images {
+		size := len(img.ImageBytes)
+
+		f, err := os.Create(filepath.Join(*outputDir, *targetFile+"_"+strconv.Itoa(size)+"."+img.ImageType))
+		if err != nil {
+			break
+		}
+		w := bufio.NewWriter(f)
+		n, err := w.Write(img.ImageBytes)
+		fmt.Printf("\twrote %d bytes\n", n)
+		if err != nil {
+
+			fmt.Println("\tInvalid image. Byte data:")
+			fmt.Println(img.ImageBytes[:10])
+			fmt.Println(img.ImageBytes[size-10:])
+			fmt.Println(err)
+
+			break
+		}
+	}
 }
