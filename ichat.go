@@ -1,7 +1,6 @@
 package iChatTool
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/base64"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -27,6 +25,12 @@ type PListKV struct {
 	Value interface{}
 }
 
+type AttachedImage struct {
+	ImageType  string
+	ImageBytes []byte
+	Img        image.Image
+}
+
 func (kv *PListKV) Print(tabs int) {
 	prefix := ""
 	if tabs == 0 {
@@ -34,7 +38,9 @@ func (kv *PListKV) Print(tabs int) {
 	} else {
 		prefix = strings.Repeat("\t", tabs)
 	}
+
 	fmt.Println(prefix + kv.Key)
+
 	switch t := kv.Value.(type) {
 	case PListArray:
 		pl := PListArray{}
@@ -56,28 +62,13 @@ func (kv *PListKV) Print(tabs int) {
 			if size < 0x1000 {
 				break
 			}
-			filetype, imgbytes, err := parseImage(decoded)
-			size = len(imgbytes)
-			f, err := os.Create(kv.Key + "_" + strconv.Itoa(size) + "." + filetype)
+			attachedimage, err := parseImage(decoded)
 			if err != nil {
 				break
 			}
-			w := bufio.NewWriter(f)
-			n, err := w.Write(imgbytes)
-			fmt.Printf(prefix+"\twrote %d bytes\n", n)
-			if err != nil {
-				fmt.Println(prefix + "\tInvalid image. Byte data:")
-				fmt.Println(imgbytes[:10])
-				fmt.Println(imgbytes[size-10:])
-				fmt.Println(err)
-
-				break
-			}
-			fmt.Println(prefix + "\tFound Image of type: " + filetype)
-
-			break
+			fmt.Println(prefix + "\tFound Image of type: " + attachedimage.ImageType)
 		}
-		fmt.Println(prefix + "\t"+t)
+		fmt.Println(prefix + "\t" + t)
 	default:
 		fmt.Print(prefix + "\t")
 		fmt.Print(t)
@@ -85,20 +76,59 @@ func (kv *PListKV) Print(tabs int) {
 	}
 }
 
-func parseImage(data []byte) (fileExtension string, filedata []byte, err error) {
+func (kv *PListKV) ExtractImages(tabs int) AttachedImage {
+	prefix := ""
+	if tabs == 0 {
+		prefix = ""
+	} else {
+		prefix = strings.Repeat("\t", tabs)
+	}
+	switch t := kv.Value.(type) {
+	case PListArray:
+		pl := PListArray{}
+		pl = t
+		for i := 0; i < len(pl.Array); i++ {
+			ret := pl.Array[i].ExtractImages(tabs + 1)
+			if ret.ImageType != "" {
+				return ret
+			}
+		}
+	case PListKV:
+		break
+	case string:
+		decoded, err := base64.StdEncoding.DecodeString(t)
+		if err == nil {
+			size := len(decoded)
+			fmt.Println(prefix + "\t" + "Base64String - size: " + strconv.Itoa(size))
+			if size < 0x1000 {
+				break
+			}
+			attachedimage, err := parseImage(decoded)
+			if err != nil {
+				break
+			}
+			fmt.Println(prefix + "\tFound Image of type: " + attachedimage.ImageType)
+			return attachedimage
+		}
+	default:
+		break
+	}
+	return AttachedImage{}
+}
+
+func parseImage(data []byte) (AttachedImage, error) {
 	// Seems like all the data starts at 0x1000 regardless of filetype
 	imgbytes := data[0x1000 : len(data)-0x4E]
 
-	_, ext, err := image.Decode(bytes.NewReader(imgbytes))
+	img, ext, err := image.Decode(bytes.NewReader(imgbytes))
 	if err == nil {
-		filedata = imgbytes
-		fileExtension= ext
-		err = nil
-		return
+		return AttachedImage{
+			ImageType:  ext,
+			ImageBytes: imgbytes,
+			Img:        img,
+		}, nil
 	}
-	fileExtension = "b64"
-	filedata = imgbytes
-	return
+	return AttachedImage{}, err
 }
 
 func check(e error) {
@@ -212,9 +242,17 @@ func readPlistFile(path string) (output map[string]interface{}) {
 	return
 }
 
-func ExtractImages(path string) {
+func ExtractData(path string) {
 	extract := extractPList(readPlistFile(path))
 	for i := 0; i < len(extract.Array); i++ {
 		extract.Array[i].Print(0)
 	}
+}
+
+func ExtractImages(path string) (images []AttachedImage) {
+	extract := extractPList(readPlistFile(path))
+	for i := 0; i < len(extract.Array); i++ {
+		images = append(images, extract.Array[i].ExtractImages(0))
+	}
+	return
 }
