@@ -24,7 +24,7 @@ func main() {
 
 	if *targetFile != "" && *targetDir != "" {
 		// error - cannot specify both
-		fmt.Println("Target file and target Dir are specified")
+		fmt.Println("Cannot specify both a single file, and a bulk directory export.")
 		return
 	}
 	if *targetFile != "" {
