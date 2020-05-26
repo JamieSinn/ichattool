@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	targetFile = flag.String("f", "TestFile.plist", "Single extraction: Target plist/ichat file to decode.")
+	targetFile = flag.String("f", "", "Single extraction: Target plist/ichat file to decode.")
 	targetDir  = flag.String("d", "", "Bulk extraction: Target directory to extract plist/ichat files from.")
 	outputDir  = flag.String("o", "", "Output directory to put extracted images in.")
 	imagesOnly = flag.Bool("i", false, "Enables image only extraction")
+	//verbose = flag.Bool("v", false, "Enable verbose logging output.")
 )
 
 func main() {
@@ -23,6 +24,7 @@ func main() {
 
 	if *targetFile != "" && *targetDir != "" {
 		// error - cannot specify both
+		fmt.Println("Target file and target Dir are specified")
 		return
 	}
 	if *targetFile != "" {
@@ -45,6 +47,7 @@ func main() {
 }
 
 func getFiles(path string) (files []string) {
+	fmt.Println(path)
 	err := filepath.Walk(path,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
