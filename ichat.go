@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/DHowett/go-plist"
+	"github.com/JamieSinn/go-plist"
 	"github.com/beevik/guid"
 	"image"
 	_ "image/gif"
